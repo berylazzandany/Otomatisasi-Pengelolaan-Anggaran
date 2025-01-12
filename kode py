@@ -1,0 +1,74 @@
+import csv
+import os
+from datetime import datetime
+
+# Fungsi untuk membaca data pengeluaran dari file CSV
+def read_expenses(file_path):
+    expenses = []
+    if os.path.exists(file_path):
+        with open(file_path, mode='r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                expenses.append({
+                    "date": datetime.strptime(row["date"], "%Y-%m-%d"),
+                    "category": row["category"],
+                    "amount": float(row["amount"]),
+                })
+    return expenses
+
+# Fungsi untuk mencatat pengeluaran baru
+def add_expense(file_path, date, category, amount):
+    new_expense = {"date": date, "category": category, "amount": amount}
+    file_exists = os.path.exists(file_path)
+    with open(file_path, mode='a', encoding='utf-8', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=["date", "category", "amount"])
+        if not file_exists:
+            writer.writeheader()  # Tulis header jika file belum ada
+        writer.writerow(new_expense)
+    print(f"Pengeluaran berhasil ditambahkan: {new_expense}")
+
+# Fungsi untuk menganalisis pengeluaran berdasarkan kategori
+def analyze_expenses(expenses):
+    summary = {}
+    for expense in expenses:
+        category = expense["category"]
+        amount = expense["amount"]
+        summary[category] = summary.get(category, 0) + amount
+    return summary
+
+# Fungsi untuk menampilkan laporan pengeluaran
+def show_report(summary):
+    print("\nLaporan Pengeluaran:")
+    total = 0
+    for category, amount in summary.items():
+        print(f"- {category}: Rp{amount:,.2f}")
+        total += amount
+    print(f"Total Pengeluaran: Rp{total:,.2f}")
+
+if __name__ == "__main__":
+    file_path = "expenses.csv"
+
+    while True:
+        print("\n=== Sistem Pengelolaan Keuangan ===")
+        print("1. Tambah Pengeluaran")
+        print("2. Lihat Laporan Pengeluaran")
+        print("3. Keluar")
+        choice = input("Pilih menu (1/2/3): ")
+
+        if choice == "1":
+            date = input("Masukkan tanggal (YYYY-MM-DD): ")
+            category = input("Masukkan kategori (makan, transport, hiburan, dll.): ")
+            amount = float(input("Masukkan jumlah pengeluaran: "))
+            add_expense(file_path, date, category, amount)
+        elif choice == "2":
+            expenses = read_expenses(file_path)
+            if expenses:
+                summary = analyze_expenses(expenses)
+                show_report(summary)
+            else:
+                print("Belum ada data pengeluaran.")
+        elif choice == "3":
+            print("Terima kasih telah menggunakan sistem ini!")
+            break
+        else:
+            print("Pilihan tidak valid. Coba lagi.")
