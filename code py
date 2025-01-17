@@ -9,8 +9,15 @@ def read_expenses(file_path):
         with open(file_path, mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
+                try:
+                    # Coba parse tanggal dengan format lengkap (hanya tanggal)
+                    expense_date = datetime.strptime(row["date"], "%Y-%m-%d").date()
+                except ValueError:
+                    print("Format tanggal salah pada data CSV.")
+                    continue
+                
                 expenses.append({
-                    "date": datetime.strptime(row["date"], "%Y-%m-%d"),
+                    "date": expense_date,
                     "category": row["category"],
                     "amount": float(row["amount"]),
                 })
@@ -18,7 +25,15 @@ def read_expenses(file_path):
 
 # Fungsi untuk mencatat pengeluaran baru
 def add_expense(file_path, date, category, amount):
-    new_expense = {"date": date, "category": category, "amount": amount}
+    # Mengonversi tanggal yang dimasukkan pengguna ke format datetime tanpa waktu
+    try:
+        expense_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        print("Format tanggal salah! Gunakan format YYYY-MM-DD.")
+        return
+
+    # Menyimpan tanggal yang dimasukkan tanpa waktu
+    new_expense = {"date": expense_date, "category": category, "amount": amount}
     file_exists = os.path.exists(file_path)
     with open(file_path, mode='a', encoding='utf-8', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=["date", "category", "amount"])
@@ -27,23 +42,110 @@ def add_expense(file_path, date, category, amount):
         writer.writerow(new_expense)
     print(f"Pengeluaran berhasil ditambahkan: {new_expense}")
 
+# Fungsi untuk menghapus pengeluaran berdasarkan ID
+def delete_expense(file_path, expense_id):
+    expenses = read_expenses(file_path)
+    if expense_id < 1 or expense_id > len(expenses):
+        print("ID pengeluaran tidak valid.")
+        return
+    
+    # Hapus pengeluaran yang dipilih
+    expense_to_delete = expenses.pop(expense_id - 1)
+    
+    # Tulis kembali data pengeluaran yang sudah diperbarui ke file CSV
+    with open(file_path, mode='w', encoding='utf-8', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=["date", "category", "amount"])
+        writer.writeheader()
+        for expense in expenses:
+            writer.writerow(expense)
+    
+    print(f"Pengeluaran berhasil dihapus: {expense_to_delete}")
+
+# Fungsi untuk menghapus seluruh data pengeluaran
+def delete_all_expenses(file_path):
+    if os.path.exists(file_path):
+        os.remove(file_path)  # Menghapus file CSV
+        print("Seluruh data pengeluaran berhasil dihapus.")
+    else:
+        print("File tidak ditemukan!")
+
 # Fungsi untuk menganalisis pengeluaran berdasarkan kategori
-def analyze_expenses(expenses):
-    summary = {}
+def analyze_expenses_by_category(expenses):
+    category_summary = {}
     for expense in expenses:
         category = expense["category"]
         amount = expense["amount"]
-        summary[category] = summary.get(category, 0) + amount
-    return summary
+        category_summary[category] = category_summary.get(category, 0) + amount
+    return category_summary
+
+# Fungsi untuk menganalisis pengeluaran per bulan
+def analyze_expenses_by_month(expenses):
+    month_summary = {}
+    for expense in expenses:
+        month = expense["date"].strftime('%Y-%m')  # Format tahun-bulan (YYYY-MM)
+        amount = expense["amount"]
+        month_summary[month] = month_summary.get(month, 0) + amount
+    return month_summary
+
+# Fungsi untuk menemukan pengeluaran terbesar dan terkecil
+def find_largest_and_smallest_expenses(expenses):
+    if not expenses:
+        return None, None
+    largest = max(expenses, key=lambda x: x['amount'])
+    smallest = min(expenses, key=lambda x: x['amount'])
+    return largest, smallest
+
+# Fungsi untuk menghitung persentase pengeluaran per kategori
+def calculate_category_percentage(expenses):
+    category_summary = analyze_expenses_by_category(expenses)
+    total_expenses = sum(category_summary.values())
+    category_percentage = {category: (amount / total_expenses) * 100 for category, amount in category_summary.items()}
+    return category_percentage
 
 # Fungsi untuk menampilkan laporan pengeluaran
-def show_report(summary):
+def show_report(expenses):
     print("\nLaporan Pengeluaran:")
     total = 0
-    for category, amount in summary.items():
-        print(f"- {category}: Rp{amount:,.2f}")
-        total += amount
+    for index, expense in enumerate(expenses, start=1):
+        # Menampilkan informasi lengkap tanggal tanpa waktu
+        print(f"{index}. {expense['category']} | Tanggal: {expense['date']} | Jumlah: Rp{expense['amount']:,.2f}")
+        total += expense['amount']
     print(f"Total Pengeluaran: Rp{total:,.2f}")
+
+# Fungsi untuk menampilkan analisis pengeluaran berdasarkan kategori
+def show_category_analysis(expenses):
+    print("\nAnalisis Pengeluaran Berdasarkan Kategori:")
+    category_summary = analyze_expenses_by_category(expenses)
+    total = sum(category_summary.values())
+    for category, amount in category_summary.items():
+        print(f"{category}: Rp{amount:,.2f} ({(amount / total) * 100:.2f}%)")
+    print(f"Total Pengeluaran: Rp{total:,.2f}")
+
+# Fungsi untuk menampilkan analisis pengeluaran bulanan
+def show_monthly_analysis(expenses):
+    print("\nAnalisis Pengeluaran Per Bulan:")
+    month_summary = analyze_expenses_by_month(expenses)
+    for month, amount in sorted(month_summary.items()):
+        print(f"{month}: Rp{amount:,.2f}")
+
+# Fungsi untuk menampilkan pengeluaran terbesar dan terkecil
+def show_largest_and_smallest_expenses(expenses):
+    largest, smallest = find_largest_and_smallest_expenses(expenses)
+    if largest and smallest:
+        print("\nPengeluaran Tertinggi:")
+        print(f"Kategori: {largest['category']} | Tanggal: {largest['date']} | Jumlah: Rp{largest['amount']:,.2f}")
+        print("\nPengeluaran Terendah:")
+        print(f"Kategori: {smallest['category']} | Tanggal: {smallest['date']} | Jumlah: Rp{smallest['amount']:,.2f}")
+    else:
+        print("\nTidak ada pengeluaran yang tercatat.")
+
+# Fungsi untuk menampilkan laporan lengkap pengeluaran dan analisis
+def show_complete_report(expenses):
+    print("\nLaporan Pengeluaran Lengkap:")
+    show_report(expenses)  # Menampilkan laporan dasar
+    show_category_analysis(expenses)  # Menampilkan analisis per kategori
+    show_monthly_analysis(expenses)  # Menampilkan analisis bulanan
+    show_largest_and_smallest_expenses(expenses)  # Menampilkan pengeluaran terbesar dan terkecil
 
 if __name__ == "__main__":
     file_path = "expenses.csv"
@@ -52,8 +154,10 @@ if __name__ == "__main__":
         print("\n=== Sistem Pengelolaan Keuangan ===")
         print("1. Tambah Pengeluaran")
         print("2. Lihat Laporan Pengeluaran")
-        print("3. Keluar")
-        choice = input("Pilih menu (1/2/3): ")
+        print("3. Hapus Pengeluaran")
+        print("4. Lihat Analisis Pengeluaran")
+        print("5. Keluar")
+        choice = input("Pilih menu (1/2/3/4/5): ")
 
         if choice == "1":
             date = input("Masukkan tanggal (YYYY-MM-DD): ")
@@ -63,11 +167,36 @@ if __name__ == "__main__":
         elif choice == "2":
             expenses = read_expenses(file_path)
             if expenses:
-                summary = analyze_expenses(expenses)
-                show_report(summary)
+                show_report(expenses)
             else:
                 print("Belum ada data pengeluaran.")
         elif choice == "3":
+            expenses = read_expenses(file_path)
+            if expenses:
+                print("\nPilihan:")
+                print("1. Hapus pengeluaran tertentu")
+                print("2. Hapus seluruh data pengeluaran")
+                sub_choice = input("Pilih opsi (1/2): ")
+                if sub_choice == "1":
+                    show_report(expenses)
+                    try:
+                        expense_id = int(input("Masukkan ID pengeluaran yang ingin dihapus: "))
+                        delete_expense(file_path, expense_id)
+                    except ValueError:
+                        print("ID pengeluaran harus berupa angka.")
+                elif sub_choice == "2":
+                    delete_all_expenses(file_path)
+                else:
+                    print("Pilihan tidak valid.")
+            else:
+                print("Belum ada data pengeluaran untuk dihapus.")
+        elif choice == "4":
+            expenses = read_expenses(file_path)
+            if expenses:
+                show_complete_report(expenses)
+            else:
+                print("Belum ada data pengeluaran untuk dianalisis.")
+        elif choice == "5":
             print("Terima kasih telah menggunakan sistem ini!")
             break
         else:
